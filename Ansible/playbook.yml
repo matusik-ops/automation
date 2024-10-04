@@ -1,84 +1,74 @@
 ---
 - name: Security Hardening on Ubuntu
   hosts: all
-  gather_facts: no
-  become: yes
+  gather_facts: false
+  become: true
   vars:
-    ssh_public_keys:
-      - "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj/QBVIaRSbOcbBCL898xdh6OHr44bbeBweIna/GbBkbGNwiBaiWmbw5bO1aA47V2aXzyITzphTXlkyFLHMLDrDw3sjRbuALmvE3Bo4X9OQ6S65M5xuO/CYegXjyix6xEay1GlXXnOU1x9c7akZkrFRXdaSZNuuG3bhsNGpzhh9sXxXn9kaE0MOui3aDeO4zTdfXxYPcH3gjSzqnB80rANiq54BHwqUL8c7byrNlWvkcSf8ldckx2SuJ8I8qJCazkEsS928c0KjFVwxzir7oUrvRQFoa+wtckXqqXe9UX0DIwKfuevytELFQn/xrt4+Zog+B7WVKLSdh4EcZkwBzgUozKnSzqeGvWVjf+oBLoz4z83rwijND2UjiqkpTFEDuCxfqhGISp8VUBDLhrSVOXDj7OaFP+GUEifasMEE2bg1HKNm8eIu0Vkh1S4UA5BpkMB6ITQEs2+m5OfLvgyPPX1iMOgEV/EV1pxz4Qmw8denwL2SijvYlJlhHHKh8/WdIU= vagrant@master"  # Replace with actual SSH public key
-      - "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCydBZtnehII5hsGLcN7Do6XvBm6tG4n4M4s3HoKRifDIpKEvw+MgZ0nSqexYs6nrN5iBdL0Vf+c3Mv3AYUTFKhDl2JTu1FkDMv0Htkr7lPi4FWKEl4+10cykggBtgJIi3AknSVET8UrWvEAxTYBIqAqTHOa2dylAD2OQHKzB7A6TmRIzNz45uZWkYgKGQDT+ZXVJbrXRurWzhQ6moJe9ETacKwkZfOXzIVehkgE1wtxgB3GygVAarOKfptgRBHlxZCObbBnUSwUPE4ZcvmZ5iRluyqlZxxveMH3Zr9pwFzuLpl278vGDnVRctpAOb1q0e1pU6uRzNmSNDLf5yIEeDf1V2XGHSe8ojjwi+LA1JVkIQYQ0mFgk+F20aSREX1TPIVo8VckHezvqdDC8Uuml6dVemRIB0pdRjk11/disOXLzC7ESDz1ASw5oq/P7Ehi3+CyOhGpkILxf79nog3T3/D0TyefsIoFgZiUfpQsv4axkKJd5vIwKH+o2DpzOh8sWM= vagrant@master"
-
-    new_user: "matusik"
-    new_user_password: "matusik"
+    new_user:
+      name: "matusik"
+      ssh_public_keys:
+        - "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCsItheE9IfdPYW9QEtXg5HvUCmm2nM33Sq+cfZPyTDUgUttTjnNKjcozCJuKYNdBnfhyuMl0I3oCpZ7ufcUGYVRYZdSk+6klS8rFZeD3js64CVnMZgqUso0FMHkeoAi/T61NnoF8aBev68TWW0a0d3bySvREt9yXvLFDeO7oMAPfyhxQ+R53Riq4yQeskfW0zRR/iO82ZJu0vImSvpbGUXpUowFWq2grdduZnl8054B1xCtZq97T/PKSjw1J5HPmMbloPcB1YcQnpTSLvnuCGeMlZ7FlbXkByx/F0Xjw78mn2sisE7OAiaWW8+3DL6c/YrwdpqXVc6fwBSr8k9FugbEpZb38zH4rqOMj74ubnXISi7FufktjbNYT8jvMEDAL01RoyA/ucCayZaX7G1gQVz146nKLlsI6yED1YO6T42c7P+fNmT44G46GjpWA3Vxd1tA0dO/ajDnyHwEtE1II9Yggu0PCCQDqfmqpTxTQAAm6hFCokyJnsdXJPxgMUsvsE= martin@martin-X556UQK"
 
   tasks:
-
-    #- name: Test connection
-    #  local_action: command ssh -q -o BatchMode=yes -o ConnectTimeout=3 {{ inventory_hostname }}
-    #  register: test_user
-    #  ignore_errors: true
-    #  changed_when: false
-
     - name: Update and Upgrade apt packages
-      apt:
-        update_cache: yes
+      ansible.builtin.apt:
+        update_cache: true
         upgrade: dist
 
-    - name: Create a non-root user
-      user:
-        name: "{{ new_user }}"
-        password: "{{ new_user_password | password_hash('sha512') }}"
+    - name: Create a new admin user
+      ansible.builtin.user:
+        name: "{{ new_user.name }}"
         groups: sudo
         shell: /bin/bash
         state: present
 
+    - name: Allow user {{ new_user.name }} to run all commands without password
+      ansible.builtin.copy:
+        dest: "/etc/sudoers.d/{{ new_user.name }}"
+        content: "{{ new_user.name }} ALL=(ALL) NOPASSWD: ALL\n"
+        owner: root
+        group: root
+        mode: '0440'
+        force: false
+
     - name: Create .ssh directory for the new user
-      file:
-        path: "/home/{{ new_user }}/.ssh"
+      ansible.builtin.file:
+        path: "/home/{{ new_user.name }}/.ssh"
         state: directory
-        owner: "{{ new_user }}"
-        group: "{{ new_user }}"
+        owner: "{{ new_user.name }}"
+        group: "{{ new_user.name }}"
         mode: '0700'
 
     - name: Add SSH public keys for the new user
-      authorized_key:
-        user: "{{ new_user }}"
+      ansible.posix.authorized_key:
+        user: "{{ new_user.name }}"
         state: present
         key: "{{ item }}"
-      loop: "{{ ssh_public_keys }}"
+      loop: "{{ new_user.ssh_public_keys }}"
 
     - name: Disable root login via SSH / Disable remote login for root
-      lineinfile:
+      ansible.builtin.lineinfile:
         path: /etc/ssh/sshd_config
         regexp: '^PermitRootLogin'
         line: 'PermitRootLogin no'
         state: present
-          #notify: restart ssh
 
-        #- name: Change SSH port
-        #lineinfile:
-        #path: /etc/ssh/sshd_config
-        #regexp: '^#?Port '
-        #line: 'Port 2222'
-        #notify: restart ssh
-          #
     - name: Disable password authentication for SSH
-      lineinfile:
+      ansible.builtin.lineinfile:
         path: /etc/ssh/sshd_config
         regexp: '^#?PasswordAuthentication'
         line: 'PasswordAuthentication no'
-          #notify: restart ssh
-  
-    #- name: Allow specific users for SSH
-    #  lineinfile:
-    #    path: /etc/ssh/sshd_config
-    #    line: 'AllowUsers {{ new_user }}'
-    #  notify: restart ssh
-        
-    - name: Enable UFW and allow SSH
-      ufw:
+      notify: Restart ssh
+
+    - name: Allow specific users for SSH
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        line: 'AllowUsers {{ new_user.name }}'
+      notify: Restart ssh
+
+    - name: Enable UFW and allow SSH, HTTP, HTTPS
+      community.general.ufw:
         rule: allow
-          #name: "SSH"
         port: '{{ item }}'
         state: enabled
       loop:
@@ -87,13 +77,14 @@
         - 443
 
     - name: Install fail2ban
-      apt:
+      ansible.builtin.apt:
         name: fail2ban
         state: present
+
     - name: Config fail2ban for ssh
-      blockinfile:
+      ansible.builtin.blockinfile:
         path: /etc/fail2ban/jail.local
-        create: yes
+        create: true
         mode: 0644
         block: |
           [DEFAULT]
@@ -104,33 +95,14 @@
       notify:
         - Enable and restart fail2ban
 
-
-
-
-          #    - name: Configure fail2ban for SSH
-          #      fail2ban:
-          #        ssh_enabled: true
-          #        ssh_port: ssh
-          #        ssh_filter: sshd
-          #        ssh_logpath: /var/log/auth.log
-          #        ssh_maxretry: 6
-          # become: true   
-
-   #    - name: Install unattended-upgrade
-   #      apt:
-   #        name: unattended-upgrades
-   #        state: present
-
-
   handlers:
-  - name: restart ssh
-    service:
-      name: ssh
-      state: restarted
+    - name: Restart ssh
+      ansible.builtin.service:
+        name: ssh
+        state: restarted
 
-  - name: Enable and restart fail2ban
-    systemd:
-      enabled: yes
-      state: restarted
-      name: fail2ban
-
+    - name: Enable and restart fail2ban
+      ansible.builtin.systemd:
+        enabled: true
+        state: restarted
+        name: fail2ban

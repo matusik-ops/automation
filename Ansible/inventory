@@ -1,10 +1,8 @@
 all:
   hosts:
-    vm2:
-      ansible_host: 192.168.56.12
+    worker1:
+      ansible_host: 192.168.56.21
       ansible_user: vagrant
       ansible_ssh_pass: vagrant
       ansible_ssh_private_key_file: ~/.ssh/id_rsa
-     # admin_user: matusik
-     # admin_ssh_pass: matusik
-     # admin_ssh_private_key_file: ~/.ssh/id_rsa
+
