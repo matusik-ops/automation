@@ -1,0 +1,108 @@
+---
+- name: Security Hardening on Ubuntu
+  hosts: all
+  become: true
+  vars:
+    new_user:
+      name: "matusik"
+      ssh_public_keys:
+        - "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCsItheE9IfdPYW9QEtXg5HvUCmm2nM33Sq+cfZPyTDUgUttTjnNKjcozCJuKYNdBnfhyuMl0I3oCpZ7ufcUGYVRYZdSk+6klS8rFZeD3js64CVnMZgqUso0FMHkeoAi/T61NnoF8aBev68TWW0a0d3bySvREt9yXvLFDeO7oMAPfyhxQ+R53Riq4yQeskfW0zRR/iO82ZJu0vImSvpbGUXpUowFWq2grdduZnl8054B1xCtZq97T/PKSjw1J5HPmMbloPcB1YcQnpTSLvnuCGeMlZ7FlbXkByx/F0Xjw78mn2sisE7OAiaWW8+3DL6c/YrwdpqXVc6fwBSr8k9FugbEpZb38zH4rqOMj74ubnXISi7FufktjbNYT8jvMEDAL01RoyA/ucCayZaX7G1gQVz146nKLlsI6yED1YO6T42c7P+fNmT44G46GjpWA3Vxd1tA0dO/ajDnyHwEtE1II9Yggu0PCCQDqfmqpTxTQAAm6hFCokyJnsdXJPxgMUsvsE= martin@martin-X556UQK"
+        - "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCVAqoyRw8/mij9GW9lZgk9zsT4EFJzfOicEKsguMu2D3ezRA1o1a+55csckmBQdpkDrUpC4rOoGbyyf0GfdtBYpJVun0JH8op1X/gILYel4Ih08GXzgZ5hgMDnPBG3B/spIZPBgjXKfaajDd5LF2BvS2vWn5U3jbsZgP6w4PDfbAMp+U7IIJvnHHlb6znRp532CRihZj6WI10gkIqVdkbWHhgeqie7KwmKGrNyUm2vtUhXdQ6HQqIvyFS4fqP4YVvppFKPuwO5gakrN2QY2QPhxu+Pskww2GbwD917W4xfdo8qIQYTnssK3uEQhWDeNEj8QBaBQpT4gc6+3LR9+LrKqDDZdY0wgWZVvR4197S02x5zfHB0x4O9AqjmbEghca3jppjazeif4eSonyv0sx2K2+2wxf8Y1bkJJVrURPNhsCJw2GKzdpx593rGbk0CEM3+mmnAI/SFNI3L8VPSyu81Tp41EDl2/kJ3SrpEqnPNCRerCXH52WfjFKPKIkfqFUs= vagrant@ansible-Vagrant-master"
+        
+  tasks:
+    - name: Update and Upgrade apt packages
+      ansible.builtin.apt:
+        update_cache: true
+        upgrade: dist
+
+    - name: Create a new admin user
+      ansible.builtin.user:
+        name: "{{ new_user.name }}"
+        groups: sudo
+        shell: /bin/bash
+        state: present
+
+    - name: Allow user {{ new_user.name }} to run all commands without password
+      ansible.builtin.copy:
+        dest: "/etc/sudoers.d/{{ new_user.name }}"
+        content: "{{ new_user.name }} ALL=(ALL) NOPASSWD: ALL\n"
+        owner: root
+        group: root
+        mode: '0440'
+        force: false
+
+    - name: Create .ssh directory for the new user
+      ansible.builtin.file:
+        path: "/home/{{ new_user.name }}/.ssh"
+        state: directory
+        owner: "{{ new_user.name }}"
+        group: "{{ new_user.name }}"
+        mode: '0700'
+
+    - name: Add SSH public keys for the new user
+      ansible.posix.authorized_key:
+        user: "{{ new_user.name }}"
+        state: present
+        key: "{{ item }}"
+      loop: "{{ new_user.ssh_public_keys }}"
+
+    - name: Disable root login via SSH / Disable remote login for root
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^PermitRootLogin'
+        line: 'PermitRootLogin no'
+        state: present
+
+    - name: Disable password authentication for SSH
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?PasswordAuthentication'
+        line: 'PasswordAuthentication no'
+      notify: Restart ssh
+
+    - name: Allow specific users for SSH
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        line: 'AllowUsers {{ new_user.name }}'
+      notify: Restart ssh
+
+    - name: Enable UFW and allow SSH, HTTP, HTTPS
+      community.general.ufw:
+        rule: allow
+        port: '{{ item }}'
+        state: enabled
+      loop:
+        - 22
+        - 80
+        - 443
+
+    - name: Install fail2ban
+      ansible.builtin.apt:
+        name: fail2ban
+        state: present
+
+    - name: Config fail2ban for ssh
+      ansible.builtin.blockinfile:
+        path: /etc/fail2ban/jail.local
+        create: true
+        mode: 0644
+        block: |
+          [DEFAULT]
+          bantime=666
+
+          [sshd]
+          enabled = true
+      notify:
+        - Enable and restart fail2ban
+
+  handlers:
+    - name: Restart ssh
+      ansible.builtin.service:
+        name: ssh
+        state: restarted
+
+    - name: Enable and restart fail2ban
+      ansible.builtin.systemd:
+        enabled: true
+        state: restarted
+        name: fail2ban
