@@ -10,10 +10,10 @@
         - "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCVAqoyRw8/mij9GW9lZgk9zsT4EFJzfOicEKsguMu2D3ezRA1o1a+55csckmBQdpkDrUpC4rOoGbyyf0GfdtBYpJVun0JH8op1X/gILYel4Ih08GXzgZ5hgMDnPBG3B/spIZPBgjXKfaajDd5LF2BvS2vWn5U3jbsZgP6w4PDfbAMp+U7IIJvnHHlb6znRp532CRihZj6WI10gkIqVdkbWHhgeqie7KwmKGrNyUm2vtUhXdQ6HQqIvyFS4fqP4YVvppFKPuwO5gakrN2QY2QPhxu+Pskww2GbwD917W4xfdo8qIQYTnssK3uEQhWDeNEj8QBaBQpT4gc6+3LR9+LrKqDDZdY0wgWZVvR4197S02x5zfHB0x4O9AqjmbEghca3jppjazeif4eSonyv0sx2K2+2wxf8Y1bkJJVrURPNhsCJw2GKzdpx593rGbk0CEM3+mmnAI/SFNI3L8VPSyu81Tp41EDl2/kJ3SrpEqnPNCRerCXH52WfjFKPKIkfqFUs= vagrant@ansible-Vagrant-master"
         
   tasks:
-    - name: Update and Upgrade apt packages
+    - name: Update apt packages
       ansible.builtin.apt:
         update_cache: true
-        upgrade: dist
+        cache_valid_time: 3600
 
     - name: Create a new admin user
       ansible.builtin.user:
