@@ -1,5 +1,11 @@
 # automation
-for project: Project_myweb/automation
+This project automates the security hardening of a newly provisioned Virtual 
+Machine (VM) using Ansible. The playbook ensures that the VM is configured 
+securely by performing several security tasks, such as creating a new admin user,
+securing SSH access with public key authentication, disabling password authentication,
+enabling the UFW firewall with necessary rules, and installing and configuring 
+Fail2Ban to prevent brute-force attacks. These steps ensure that the VM is ready 
+for secure use in production or development environments.
 
 ### Requirements:
 
